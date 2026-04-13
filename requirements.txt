@@ -4,11 +4,15 @@ supabase==2.3.4
 # Football data scraping
 soccerdata==1.5.0
 
-# Data manipulation (soccerdata dependency, pinned for stability)
+# Understat (goal times, xG)
+understat==0.3.3
+aiohttp==3.9.5
+
+# Data manipulation
 pandas==2.1.4
 numpy==1.26.4
 
-# HTTP & HTML parsing (soccerdata dependency)
+# HTTP & HTML parsing
 requests==2.31.0
 lxml==5.1.0
 beautifulsoup4==4.12.3
