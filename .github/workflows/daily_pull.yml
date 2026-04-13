@@ -1,14 +1,32 @@
-# .github/workflows/daily_pull.yml
-name: Daily Fixture Pull
+# .github/workflows/daily_update.yml
+name: Daily Data Pipeline
 
 on:
   schedule:
-    # Runs at 00:05 UTC every day (5-min offset avoids the midnight spike)
+    # Job 1: Pull today's fixtures at 00:05 UTC
+    # Job 2: Pull yesterday's goal events at 23:00 UTC
     - cron: "5 0 * * *"
-  workflow_dispatch:   # also allows manual trigger from the GitHub Actions UI
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which script to run manually"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - fixtures
+          - events
 
 jobs:
+  # ── Job 1: Daily fixture pull (midnight) ──────────────────
   pull-fixtures:
+    # Run on the midnight cron OR manual trigger for fixtures/both
+    if: |
+      github.event_name == 'workflow_dispatch' && 
+      (github.event.inputs.job == 'fixtures' || github.event.inputs.job == 'both') ||
+      (github.event_name == 'schedule' && github.event.schedule == '5 0 * * *')
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -25,10 +43,41 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run daily fixture pull
+      - name: Run fixture pull
         env:
           SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           TARGET_LEAGUE:        ${{ secrets.TARGET_LEAGUE }}
           TARGET_SEASON:        ${{ secrets.TARGET_SEASON }}
         run: python daily_pull.py
+
+  # ── Job 2: Goal events pull (23:00 UTC) ───────────────────
+  pull-events:
+    # Run on the 23:00 cron OR manual trigger for events/both
+    if: |
+      github.event_name == 'workflow_dispatch' && 
+      (github.event.inputs.job == 'events' || github.event.inputs.job == 'both') ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 23 * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run event pull
+        env:
+          SUPABASE_URL:             ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY:     ${{ secrets.SUPABASE_SERVICE_KEY }}
+          UNDERSTAT_LEAGUE:         ${{ secrets.UNDERSTAT_LEAGUE }}
+          TARGET_SEASON_UNDERSTAT:  ${{ secrets.TARGET_SEASON_UNDERSTAT }}
+        run: python event_pull.py
